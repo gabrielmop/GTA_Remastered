@@ -27,9 +27,9 @@
 
 #include <systemctrl.h>
 
-PSP_MODULE_INFO("gta_patch", 0x0007, 1, 0);
+PSP_MODULE_INFO("GTARemasteredControls", 0x1007, 1, 0);
 
-#define MAKE_CALL(a, f) _sw(0x0C000000 | (((u32)(f) >> 2) & 0x03FFFFFF), a);
+int sceKernelQuerySystemCall(void *function);
 
 #define REDIRECT_FUNCTION(a, f) \
 { \
@@ -41,75 +41,116 @@ PSP_MODULE_INFO("gta_patch", 0x0007, 1, 0);
 #define MAX_VALUE 0xFF
 #define CENTER 0x80
 #define DEADZONE 0x20
+
 #define FACTOR 1.2f
 
 STMOD_HANDLER previous;
 
+u32 MakeSyscallStub(void *function) {
+	SceUID block_id = sceKernelAllocPartitionMemory(PSP_MEMORY_PARTITION_USER, "", PSP_SMEM_High, 2 * sizeof(u32), NULL);
+	u32 stub = (u32)sceKernelGetBlockHeadAddr(block_id);
+	_sw(0x03E00008, stub);
+	_sw(0x0000000C | (sceKernelQuerySystemCall(function) << 6), stub + 4);
+	return stub;
+}
+
 int cameraX() {
+	int k1 = pspSdkSetK1(0);
+
 	SceCtrlData pad;
 	sceCtrlPeekBufferPositive(&pad, 1);
 
 	char rx = pad.Rsrv[0] - CENTER;
-	if (rx < -DEADZONE || rx > DEADZONE)
+	if (rx < -DEADZONE || rx > DEADZONE) {
+		pspSdkSetK1(k1);
 		return (int)((float)rx * FACTOR);
+	}
 
+	pspSdkSetK1(k1);
 	return 0;
 }
 
 int cameraY() {
+	int k1 = pspSdkSetK1(0);
+
 	SceCtrlData pad;
 	sceCtrlPeekBufferPositive(&pad, 1);
 
 	char ry = MAX_VALUE - pad.Rsrv[1] - CENTER;
-	if (ry < -DEADZONE || ry > DEADZONE)
+	if (ry < -DEADZONE || ry > DEADZONE) {
+		pspSdkSetK1(k1);
 		return (int)((float)ry * FACTOR);
+	}
 
+	pspSdkSetK1(k1);
 	return 0;
 }
 
 int aimX() {
+	int k1 = pspSdkSetK1(0);
+
 	SceCtrlData pad;
 	sceCtrlPeekBufferPositive(&pad, 1);
 
 	char lx = pad.Lx - CENTER;
-	if (lx < -DEADZONE || lx > DEADZONE)
+	if (lx < -DEADZONE || lx > DEADZONE) {
+		pspSdkSetK1(k1);
 		return (int)((float)lx * FACTOR);
+	}
 
 	char rx = pad.Rsrv[0] - CENTER;
-	if (rx < -DEADZONE || rx > DEADZONE)
+	if (rx < -DEADZONE || rx > DEADZONE) {
+		pspSdkSetK1(k1);
 		return (int)((float)rx * FACTOR);
+	}
 
+	pspSdkSetK1(k1);
 	return 0;
 }
 
 int aimY() {
+	int k1 = pspSdkSetK1(0);
+
 	SceCtrlData pad;
 	sceCtrlPeekBufferPositive(&pad, 1);
 
 	char ly = MAX_VALUE - pad.Ly - CENTER;
-	if (ly < -DEADZONE || ly > DEADZONE)
+	if (ly < -DEADZONE || ly > DEADZONE) {
+		pspSdkSetK1(k1);
 		return (int)((float)ly * FACTOR);
+	}
 
 	char ry = MAX_VALUE - pad.Rsrv[1] - CENTER;
-	if (ry < -DEADZONE || ry > DEADZONE)
+	if (ry < -DEADZONE || ry > DEADZONE) {
+		pspSdkSetK1(k1);
 		return (int)((float)ry * FACTOR);
+	}
 
+	pspSdkSetK1(k1);
 	return 0;
 }
 
 int crossPressedLCS(void *a0) {
+	int k1 = pspSdkSetK1(0);
+
 	if (((u16 *)a0)[67] == 0) {
+		pspSdkSetK1(k1);
 		return ((u16 *)a0)[7];
 	}
 
+	pspSdkSetK1(k1);
 	return 0;
 }
 
 int crossPressedVCS(void *a0) {
+	int k1 = pspSdkSetK1(0);
+
 	if (((u16 *)a0)[77] == 0) {
+		pspSdkSetK1(k1);
 		return ((u16 *)a0)[7];
 	}
 
+	pspSdkSetK1(k1);
 	return 0;
 }
 
@@ -125,22 +166,22 @@ int OnModuleStart(SceModule2 *mod) {
 			// Redirect camera movement
 			if (_lw(addr) == 0x14800036 && _lw(addr + 0x10) == 0x10400016) {
 				// log("VCS CAMERA: 0x%08X, 0x%08X\n", addr - 0x18 - text_addr, addr - 0x18 + 0x108 - text_addr);
-				REDIRECT_FUNCTION(addr - 0x18, cameraX);
-				REDIRECT_FUNCTION(addr - 0x18 + 0x108, cameraY);
+				REDIRECT_FUNCTION(addr - 0x18, MakeSyscallStub(cameraX));
+				REDIRECT_FUNCTION(addr - 0x18 + 0x108, MakeSyscallStub(cameraY));
 				continue;
 			}
 
 			// Redirect gun aim movement x
 			if (_lw(addr) == 0x04800040 && _lw(addr + 0x8) == 0x1080003E) {
 				// log("VCS AIM X: 0x%08X\n", addr - 0x14 - text_addr);
-				REDIRECT_FUNCTION(addr - 0x14, aimX);
+				REDIRECT_FUNCTION(addr - 0x14, MakeSyscallStub(aimX));
 				continue;
 			}
 
 			// Redirect gun aim movement y
 			if (_lw(addr) == 0x0480003F && _lw(addr + 0x8) == 0x1080003D) {
 				// log("VCS AIM Y: 0x%08X\n", addr - 0x14 - text_addr);
-				REDIRECT_FUNCTION(addr - 0x14, aimY);
+				REDIRECT_FUNCTION(addr - 0x14, MakeSyscallStub(aimY));
 				continue;
 			}
 
@@ -150,7 +191,7 @@ int OnModuleStart(SceModule2 *mod) {
 				_lw(addr + 0x10) == 0x00000000 && _lw(addr + 0x14) == 0x10000002 &&
 				_lw(addr + 0x18) == 0x00001025 && _lw(addr + 0x1C) == 0x8482002A) {
 				// log("VCS CROSS: 0x%08X\n", addr - text_addr);
-				REDIRECT_FUNCTION(addr, crossPressedVCS);
+				REDIRECT_FUNCTION(addr, MakeSyscallStub(crossPressedVCS));
 				continue;
 			}
 
@@ -182,22 +223,22 @@ int OnModuleStart(SceModule2 *mod) {
 			// Redirect camera movement
 			if (_lw(addr) == 0x14800034 && _lw(addr + 0x10) == 0x10400014) {
 				// log("LCS CAMERA: 0x%08X, 0x%08X\n", addr - 0x18 - text_addr, addr - 0x18 + 0x100 - text_addr);
-				REDIRECT_FUNCTION(addr - 0x18, cameraX);
-				REDIRECT_FUNCTION(addr - 0x18 + 0x100, cameraY);
+				REDIRECT_FUNCTION(addr - 0x18, MakeSyscallStub(cameraX));
+				REDIRECT_FUNCTION(addr - 0x18 + 0x100, MakeSyscallStub(cameraY));
 				continue;
 			}
 
 			// Redirect gun aim movement x
 			if (_lw(addr) == 0x04800036 && _lw(addr + 0x8) == 0x10800034) {
 				// log("LCS AIM X: 0x%08X\n", addr - 0x14 - text_addr)
-				REDIRECT_FUNCTION(addr - 0x14, aimX);
+				REDIRECT_FUNCTION(addr - 0x14, MakeSyscallStub(aimX));
 				continue;
 			}
 
 			// Redirect gun aim movement y
 			if (_lw(addr) == 0x04800041 && _lw(addr + 0x8) == 0x1080003F) {
 				// log("LCS AIM Y: 0x%08X\n", addr - 0x14 - text_addr)
-				REDIRECT_FUNCTION(addr - 0x14, aimY);
+				REDIRECT_FUNCTION(addr - 0x14, MakeSyscallStub(aimY));
 				continue;
 			}
 
@@ -206,7 +247,7 @@ int OnModuleStart(SceModule2 *mod) {
 				_lw(addr + 0x08) == 0x00000000 && _lw(addr + 0x0C) == 0x10000002 &&
 				_lw(addr + 0x10) == 0x00001025 && _lw(addr + 0x14) == 0x8482002A) {
 				// log("LCS CROSS: 0x%08X\n", addr - text_addr);
-				REDIRECT_FUNCTION(addr, crossPressedLCS);
+				REDIRECT_FUNCTION(addr, MakeSyscallStub(crossPressedLCS));
 				continue;
 			}
 
@@ -234,6 +275,7 @@ int OnModuleStart(SceModule2 *mod) {
 		}
 
 		sceKernelDcacheWritebackAll();
+		sceKernelIcacheClearAll();
 	}
 
 	if (!previous)
