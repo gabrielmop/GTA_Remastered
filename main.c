@@ -51,7 +51,7 @@ enum GtaPad {
 
 STMOD_HANDLER previous;
 
-static u32 vcsAccelerationNormalStub;
+static u32 cameraXStub, cameraYStub, aimXStub, aimYStub, vcsAccelerationStub, vcsAccelerationNormalStub, lcsAccelerationStub;
 
 static u32 MakeSyscallStub(void *function) {
 	SceUID block_id = sceKernelAllocPartitionMemory(PSP_MEMORY_PARTITION_USER, "", PSP_SMEM_High, 2 * sizeof(u32), NULL);
@@ -98,13 +98,8 @@ short lcsAcceleration(short *pad) {
 int PatchVCS(u32 addr, u32 text_addr) {
 	// Implement right analog stick
 	if (_lw(addr) == 0x10000006 && _lw(addr + 0x4) == 0xA3A70003) {
-		_sw(0x10000003, addr + 0x00);
-		_sw(0x93A6000E, addr + 0x10); // lbu $a2, 14($sp)
-		_sw(0x93A7000F, addr + 0x14); // lbu $a3, 15($sp)
-		_sw(0x00000000, addr + 0x18); // nop
-		_sw(0xA3A60000, addr + 0x1C); // sb $a2, 0($sp)
-		_sw(0xA3A70001, addr + 0x20); // sb $a3, 1($sp)
-		_sw(0x8E060054, addr + 0x24); // lw $a2, 84($s0)
+		_sw(0xA7A50000 | (_lh(addr + 0x1C)), addr + 0x24); // sh $a1, X($sp)
+		_sw(0x97A50000 | (_lh(addr - 0xC) + 0x2), addr + 0x1C); // lhu $a1, X($sp)
 		return 1;
 	}
 
@@ -112,17 +107,15 @@ int PatchVCS(u32 addr, u32 text_addr) {
 	if (_lw(addr) == 0x14800036 && _lw(addr + 0x10) == 0x10400016) {
 		_sw(0x00000000, addr + 0x00);
 		_sw(0x10000016, addr + 0x10);
-		MAKE_CALL(addr + 0x8C, MakeSyscallStub(cameraX));
+		MAKE_CALL(addr + 0x8C, cameraXStub);
 		_sw(0x00000000, addr + 0x108);
 		_sw(0x10000002, addr + 0x118);
-		MAKE_CALL(addr + 0x144, MakeSyscallStub(cameraY));
+		MAKE_CALL(addr + 0x144, cameraYStub);
 		return 1;
 	}
 
 	// Redirect gun aim movement
 	if (_lw(addr) == 0x04800040 && _lw(addr + 0x8) == 0x1080003E) {
-		u32 aimXStub = MakeSyscallStub(aimX);
-		u32 aimYStub = MakeSyscallStub(aimY);
 		MAKE_CALL(addr + 0x50, aimXStub);
 		MAKE_CALL(addr + 0x7C, aimXStub);
 		MAKE_CALL(addr + 0x8C, aimXStub);
@@ -136,7 +129,7 @@ int PatchVCS(u32 addr, u32 text_addr) {
 		_lw(addr + 0x08) == 0x30A500FF && _lw(addr + 0x0C) == 0x10A00003 &&
 		_lw(addr + 0x10) == 0x00000000 && _lw(addr + 0x14) == 0x10000002 &&
 		_lw(addr + 0x18) == 0x00001025 && _lw(addr + 0x1C) == 0x8482002A) {
-		REDIRECT_FUNCTION(addr, MakeSyscallStub(vcsAcceleration));
+		REDIRECT_FUNCTION(addr, vcsAccelerationStub);
 		return 1;
 	}
 
@@ -179,13 +172,8 @@ int PatchVCS(u32 addr, u32 text_addr) {
 int PatchLCS(u32 addr, u32 text_addr) {
 	// Implement right analog stick
 	if (_lw(addr) == 0x10000006 && _lw(addr + 0x4) == 0xA3A70013) {
-		_sw(0x10000003, addr + 0x00);
-		_sw(0x93A6001E, addr + 0x10); // lbu $a2, 30($sp)
-		_sw(0x93A7001F, addr + 0x14); // lbu $a3, 31($sp)
-		_sw(0x00000000, addr + 0x18); // nop
-		_sw(0xA3A60010, addr + 0x1C); // sb $a2, 16($sp)
-		_sw(0xA3A70011, addr + 0x20); // sb $a3, 17($sp)
-		_sw(0x8E060054, addr + 0x24); // lw $a2, 84($s0)
+		_sw(0xA7A50000 | (_lh(addr + 0x1C)), addr + 0x24); // sh $a1, X($sp)
+		_sw(0x97A50000 | (_lh(addr - 0xC) + 0x2), addr + 0x1C); // lhu $a1, X($sp)
 		return 1;
 	}
 
@@ -193,17 +181,15 @@ int PatchLCS(u32 addr, u32 text_addr) {
 	if (_lw(addr) == 0x14800034 && _lw(addr + 0x10) == 0x10400014) {
 		_sw(0x00000000, addr + 0x00);
 		_sw(0x10000014, addr + 0x10);
-		MAKE_CALL(addr + 0x84, MakeSyscallStub(cameraX));
+		MAKE_CALL(addr + 0x84, cameraXStub);
 		_sw(0x00000000, addr + 0x100);
 		_sw(0x10000002, addr + 0x110);
-		MAKE_CALL(addr + 0x13C, MakeSyscallStub(cameraY));
+		MAKE_CALL(addr + 0x13C, cameraYStub);
 		return 1;
 	}
 
 	// Redirect gun aim movement
 	if (_lw(addr) == 0x04800036 && _lw(addr + 0x8) == 0x10800034) {
-		u32 aimXStub = MakeSyscallStub(aimX);
-		u32 aimYStub = MakeSyscallStub(aimY);
 		MAKE_CALL(addr + 0x3C, aimXStub);
 		MAKE_CALL(addr + 0x68, aimXStub);
 		MAKE_CALL(addr + 0x78, aimXStub);
@@ -216,7 +202,7 @@ int PatchLCS(u32 addr, u32 text_addr) {
 	if (_lw(addr + 0x00) == 0x94850086 && _lw(addr + 0x04) == 0x10A00003 &&
 		_lw(addr + 0x08) == 0x00000000 && _lw(addr + 0x0C) == 0x10000002 &&
 		_lw(addr + 0x10) == 0x00001025 && _lw(addr + 0x14) == 0x8482002A) {
-		REDIRECT_FUNCTION(addr, MakeSyscallStub(lcsAcceleration));
+		REDIRECT_FUNCTION(addr, lcsAccelerationStub);
 		return 1;
 	}
 
@@ -249,7 +235,13 @@ int OnModuleStart(SceModule2 *mod) {
 	int gta_version = -1;
 
 	if (strcmp(modname, "GTA3") == 0) {
+		cameraXStub = MakeSyscallStub(cameraX);
+		cameraYStub = MakeSyscallStub(cameraY);
+		aimXStub = MakeSyscallStub(aimX);
+		aimYStub = MakeSyscallStub(aimY);
+		vcsAccelerationStub = MakeSyscallStub(vcsAcceleration);
 		vcsAccelerationNormalStub = MakeSyscallStub(vcsAccelerationNormal);
+		lcsAccelerationStub = MakeSyscallStub(lcsAcceleration);
 
 		u32 i;
 		for (i = 0; i < mod->text_size; i += 4) {
