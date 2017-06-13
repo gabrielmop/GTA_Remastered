@@ -7,5 +7,6 @@ This patch has been tested for GTA LCS German V1 and GTA VCS German V1. They sho
 Note that this patch does swap R and X for driving. Now you can accelerate with R and use handbrake with X. This way, the use of the right analog stick is cooler
 
 Changelog v2
+- Changing invert look in options menu will now affect the right analog stick.
 - Fixed bug where flying planes and helicopters didn't work, because the R trigger was both used for acceleration and rotation.
 - Fixed bug where pressing L trigger for slow aiming didn't work.
